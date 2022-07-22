@@ -6,7 +6,6 @@ use crate::{
         Vendor::*,
     },
     free_encoder, new_encoder, AVPixelFormat, Quality, RateContorl, AV_LOG_ERROR, AV_LOG_PANIC,
-    AV_NUM_DATA_POINTERS,
 };
 use log::{error, trace};
 use std::{
@@ -22,13 +21,13 @@ use std::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct EncodeContext {
     pub name: String,
-    pub width: i32,
-    pub height: i32,
+    pub width: usize,
+    pub height: usize,
     pub pixfmt: AVPixelFormat,
-    pub align: i32,
-    pub bitrate: i32,
+    pub align: usize,
+    pub bitrate: usize,
     pub timebase: [i32; 2],
-    pub gop: i32,
+    pub gop: usize,
     pub quality: Quality,
     pub rc: RateContorl,
 }
@@ -48,35 +47,23 @@ pub struct Encoder {
     codec: Box<c_void>,
     frames: *mut Vec<EncodeFrame>,
     pub ctx: EncodeContext,
-    pub linesize: Vec<i32>,
-    pub offset: Vec<i32>,
-    pub length: i32,
 }
 
 impl Encoder {
     pub fn new(ctx: EncodeContext) -> Result<Self, ()> {
         unsafe {
-            let mut linesize = Vec::<i32>::new();
-            linesize.resize(AV_NUM_DATA_POINTERS as _, 0);
-            let mut offset = Vec::<i32>::new();
-            offset.resize(AV_NUM_DATA_POINTERS as _, 0);
-            let mut length = Vec::<i32>::new();
-            length.resize(1, 0);
             let codec = new_encoder(
                 CString::new(ctx.name.as_str()).map_err(|_| ())?.as_ptr(),
-                ctx.width,
-                ctx.height,
+                ctx.width as c_int,
+                ctx.height as c_int,
                 ctx.pixfmt as c_int,
-                ctx.align,
+                ctx.align as c_int,
                 ctx.bitrate as _,
                 ctx.timebase[0],
                 ctx.timebase[1],
-                ctx.gop,
+                ctx.gop as c_int,
                 ctx.quality as _,
                 ctx.rc as _,
-                linesize.as_mut_ptr(),
-                offset.as_mut_ptr(),
-                length.as_mut_ptr(),
                 Some(Encoder::callback),
             );
 
@@ -88,9 +75,6 @@ impl Encoder {
                 codec: Box::from_raw(codec as *mut c_void),
                 frames: Box::into_raw(Box::new(Vec::<EncodeFrame>::new())),
                 ctx,
-                linesize,
-                offset,
-                length: length[0],
             })
         }
     }

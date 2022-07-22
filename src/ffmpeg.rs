@@ -110,13 +110,10 @@ pub fn ffmpeg_linesize_offset_length(
     width: usize,
     height: usize,
     align: usize,
-) -> Result<(Vec<i32>, Vec<i32>, i32), ()> {
-    let mut linesize = Vec::<c_int>::new();
-    linesize.resize(AV_NUM_DATA_POINTERS as _, 0);
-    let mut offset = Vec::<c_int>::new();
-    offset.resize(AV_NUM_DATA_POINTERS as _, 0);
-    let mut length = Vec::<c_int>::new();
-    length.resize(1, 0);
+) -> Result<([usize; 2], [usize; 2], usize), ()> {
+    let mut linesize: [c_int; 2] = [0; 2];
+    let mut offset: [c_int; 2] = [0; 2];
+    let mut length: [c_int; 1] = [0; 1];
     unsafe {
         if get_linesize_offset_length(
             pixfmt as _,
@@ -128,7 +125,11 @@ pub fn ffmpeg_linesize_offset_length(
             length.as_mut_ptr(),
         ) == 0
         {
-            return Ok((linesize, offset, length[0]));
+            return Ok((
+                linesize.map(|i| i as usize),
+                offset.map(|i| i as usize),
+                length[0] as usize,
+            ));
         }
     }
 

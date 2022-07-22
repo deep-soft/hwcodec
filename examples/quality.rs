@@ -67,7 +67,7 @@ fn mixed(mut ctx: EncodeContext, yuvs: &Vec<Vec<u8>>) {
 
 fn bitrate(mut ctx: EncodeContext, yuvs: &Vec<Vec<u8>>) {
     let arr = [
-        -1, 1000, 8000, 200_000, 1_000_000, 1_320_000, 2_000_000, 4_000_000,
+        1000, 8000, 200_000, 1_000_000, 1_320_000, 2_000_000, 4_000_000,
     ];
     for v in arr.iter() {
         ctx.bitrate = v.clone();

@@ -28,7 +28,7 @@ typedef struct Encoder {
   AVCodecContext *c;
   AVFrame *frame;
   AVPacket *pkt;
-  int offset[AV_NUM_DATA_POINTERS];
+  int offset[2];
   char name[32];
   EncodeCallback callback;
 
@@ -38,8 +38,9 @@ typedef struct Encoder {
 #endif
 } Encoder;
 
-static int calculate_offset_length(int pix_fmt, int height, const int *linesize,
-                                   int *offset, int *length) {
+static int calculate_offset_length(int pix_fmt, int height,
+                                   const int linesize[2], int offset[2],
+                                   int *length) {
   switch (pix_fmt) {
     case AV_PIX_FMT_YUV420P:
       offset[0] = linesize[0] * height;
@@ -59,7 +60,7 @@ static int calculate_offset_length(int pix_fmt, int height, const int *linesize,
 }
 
 int get_linesize_offset_length(int pix_fmt, int width, int height, int align,
-                               int *linesize, int *offset, int *length) {
+                               int linesize[2], int offset[2], int *length) {
   AVFrame *frame = NULL;
   int ilength;
   int ret = -1;
@@ -78,8 +79,7 @@ int get_linesize_offset_length(int pix_fmt, int width, int height, int align,
     goto _exit;
   }
   if (linesize) {
-    for (int i = 0; i < AV_NUM_DATA_POINTERS; i++)
-      linesize[i] = frame->linesize[i];
+    for (int i = 0; i < 2; i++) linesize[i] = frame->linesize[i];
   }
   if (offset) {
     ret = calculate_offset_length(pix_fmt, height, frame->linesize, offset,
@@ -234,7 +234,6 @@ static int set_rate_control(void *priv_data, const char *name, int rc) {
 Encoder *new_encoder(const char *name, int width, int height, int pixfmt,
                      int align, int bit_rate, int time_base_num,
                      int time_base_den, int gop, int quality, int rc,
-                     int *linesize, int *offset, int *length,
                      EncodeCallback callback) {
   const AVCodec *codec = NULL;
   AVCodecContext *c = NULL;
@@ -326,13 +325,8 @@ Encoder *new_encoder(const char *name, int width, int height, int pixfmt,
 #endif
 
   if (get_linesize_offset_length(pixfmt, width, height, align, NULL,
-                                 encoder->offset, length) != 0)
+                                 encoder->offset, NULL) != 0)
     goto _exit;
-
-  for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
-    linesize[i] = frame->linesize[i];
-    offset[i] = encoder->offset[i];
-  }
 
   return encoder;
 
@@ -345,7 +339,7 @@ _exit:
 }
 
 static int fill_frame(AVFrame *frame, uint8_t *data, int data_length,
-                      const int *const offset) {
+                      int offset[2]) {
   switch (frame->format) {
     case AV_PIX_FMT_NV12:
       if (data_length !=
