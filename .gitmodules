@@ -1,0 +1,3 @@
+[submodule "ffmpeg"]
+    path = ffmpeg
+    url = git@github.com:21pages/ffmpeg-release.git
