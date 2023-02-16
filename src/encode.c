@@ -252,7 +252,7 @@ Encoder *new_encoder(const char *name, int width, int height, int pixfmt,
   int ret;
 
   if (!(codec = avcodec_find_encoder_by_name(name))) {
-    fprintf(stderr, "Codec %s not found\n", codec);
+    fprintf(stderr, "Codec %s not found\n", name);
     goto _exit;
   }
 
@@ -313,6 +313,16 @@ Encoder *new_encoder(const char *name, int width, int height, int pixfmt,
   }
   set_quality(c->priv_data, name, quality);
   set_rate_control(c->priv_data, name, rc);
+  if (strcmp(name, "h264_videotoolbox") == 0 || strcmp(name, "hevc_videotoolbox") == 0) {
+    if ((ret = av_opt_set(c->priv_data, "allow_sw", "true", 0)) < 0) {
+      fprintf(stderr, "amf set opt allow_sw true failed: %s\n", av_err2str(ret));
+      goto _exit;
+    }
+    if ((ret = av_opt_set(c->priv_data, "realtime", "true", 0)) < 0) {
+      fprintf(stderr, "amf set opt realtime true failed: %s\n", av_err2str(ret));
+      goto _exit;
+    }
+  }
 
   if ((ret = avcodec_open2(c, codec, NULL)) < 0) {
     fprintf(stderr, "avcodec_open2: %s\n", av_err2str(ret));
