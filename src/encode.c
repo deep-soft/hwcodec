@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// #define CFG_PKG_TRACE
+#define CFG_PKG_TRACE
 
 extern void my_fprintf(FILE *const _Stream, const char *const _Format, ...);
 #define fprintf my_fprintf
@@ -121,6 +121,16 @@ static int set_lantency_free(void *priv_data, const char *name) {
   if (strcmp(name, "h264_qsv") == 0 || strcmp(name, "hevc_qsv") == 0) {
     if ((ret = av_opt_set(priv_data, "async_depth", "1", 0)) < 0) {
       fprintf(stderr, "qsv set opt failed: %s\n", av_err2str(ret));
+      return -1;
+    }
+  }
+  if (strcmp(name, "h264_videotoolbox") == 0 || strcmp(name, "hevc_videotoolbox") == 0) {
+    if ((ret = av_opt_set(priv_data, "realtime", "true", 0)) < 0) {
+      fprintf(stderr, "videotoolbox set opt realtime true failed: %s\n", av_err2str(ret));
+      return -1;
+    }
+    if ((ret = av_opt_set(priv_data, "max_frame_delay_count", "0", 0)) < 0) {
+      fprintf(stderr, "videotoolbox set opt max_frame_delay_count 0 failed: %s\n", av_err2str(ret));
       return -1;
     }
   }
@@ -314,12 +324,9 @@ Encoder *new_encoder(const char *name, int width, int height, int pixfmt,
   set_quality(c->priv_data, name, quality);
   set_rate_control(c->priv_data, name, rc);
   if (strcmp(name, "h264_videotoolbox") == 0 || strcmp(name, "hevc_videotoolbox") == 0) {
+    // virtual machine debug option, should delete in the future
     if ((ret = av_opt_set(c->priv_data, "allow_sw", "true", 0)) < 0) {
-      fprintf(stderr, "amf set opt allow_sw true failed: %s\n", av_err2str(ret));
-      goto _exit;
-    }
-    if ((ret = av_opt_set(c->priv_data, "realtime", "true", 0)) < 0) {
-      fprintf(stderr, "amf set opt realtime true failed: %s\n", av_err2str(ret));
+      fprintf(stderr, "videotoolbox set opt allow_sw true failed: %s\n", av_err2str(ret));
       goto _exit;
     }
   }
