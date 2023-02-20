@@ -5,7 +5,7 @@ use crate::{
         DataFormat::{self, *},
         Vendor::*,
     },
-    free_encoder, new_encoder, AVPixelFormat, Quality, RateControl, AV_LOG_ERROR, AV_LOG_PANIC,
+    free_encoder, new_encoder, AVPixelFormat, Quality, RateControl, AV_LOG_ERROR, AV_LOG_TRACE,
     AV_NUM_DATA_POINTERS,
 };
 use log::{error, trace};
@@ -162,10 +162,11 @@ impl Encoder {
 
     // TODO
     fn available_encoders_(ctx: EncodeContext) -> Vec<CodecInfo> {
+        log::info!("begin available_encoders_");
         let log_level;
         unsafe {
             log_level = av_log_get_level();
-            av_log_set_level(AV_LOG_PANIC as _);
+            av_log_set_level(AV_LOG_TRACE as _);
         };
         let mut codecs = vec![
             // 264
@@ -240,18 +241,20 @@ impl Encoder {
                         ..ctx
                     };
                     let start = Instant::now();
+                    log::info!("test encoder {} start", codec.name);
                     if let Ok(mut encoder) = Encoder::new(c) {
                         log::debug!("{} new {:?}", codec.name, start.elapsed());
                         let start = Instant::now();
                         if let Ok(_) = encoder.encode(&yuv) {
                             log::debug!("{} encode {:?}", codec.name, start.elapsed());
-                            infos.lock().unwrap().push(codec);
+                            infos.lock().unwrap().push(codec.clone());
                         } else {
                             log::debug!("{} encode failed {:?}", codec.name, start.elapsed());
                         }
                     } else {
                         log::debug!("{} new failed {:?}", codec.name, start.elapsed());
                     }
+                    log::info!("test encoder {} end", codec.name);
                 });
                 handles.push(handle);
             }
@@ -264,6 +267,7 @@ impl Encoder {
         unsafe {
             av_log_set_level(log_level);
         }
+        log::info!("finish available_encoders_");
 
         res
     }

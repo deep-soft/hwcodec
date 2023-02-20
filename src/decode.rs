@@ -6,7 +6,7 @@ use crate::{
         DataFormat::*,
         Vendor::*,
     },
-    free_decoder, get_bin_file, new_decoder, AVPixelFormat, AV_LOG_ERROR, AV_LOG_PANIC,
+    free_decoder, get_bin_file, new_decoder, AVPixelFormat, AV_LOG_ERROR, AV_LOG_TRACE,
     AV_NUM_DATA_POINTERS,
 };
 use core::slice;
@@ -171,10 +171,11 @@ impl Decoder {
     }
 
     fn available_decoders_() -> Vec<CodecInfo> {
+        log::info!("begin available_decoders_");
         let log_level;
         unsafe {
             log_level = av_log_get_level();
-            av_log_set_level(AV_LOG_PANIC as _);
+            av_log_set_level(AV_LOG_TRACE as _);
         };
 
         // TODO
@@ -310,60 +311,63 @@ impl Decoder {
 
         let buf264 = Arc::new(buf264);
         let buf265 = Arc::new(buf265);
-        let mut handles = vec![];
+        // let mut handles = vec![];
+        log::info!("all test codecs:{:?}", codecs);
         for codec in codecs {
             let infos = infos.clone();
             let buf264 = buf264.clone();
             let buf265 = buf265.clone();
-            let handle = thread::spawn(move || {
-                let c = DecodeContext {
-                    name: codec.name.clone(),
-                    device_type: codec.hwdevice,
+            // let handle = thread::spawn(move || {
+            let c = DecodeContext {
+                name: codec.name.clone(),
+                device_type: codec.hwdevice,
+            };
+            let start = Instant::now();
+            log::info!("test decoder {:?} start", codec);
+            if let Ok(mut decoder) = Decoder::new(c) {
+                log::debug!(
+                    "name:{} device:{:?} new:{:?}",
+                    codec.name.clone(),
+                    codec.hwdevice,
+                    start.elapsed()
+                );
+                let data = match codec.format {
+                    H264 => &buf264[..],
+                    H265 => &buf265[..],
                 };
                 let start = Instant::now();
-                if let Ok(mut decoder) = Decoder::new(c) {
+                if let Ok(_) = decoder.decode(data) {
                     log::debug!(
-                        "name:{} device:{:?} new:{:?}",
-                        codec.name.clone(),
+                        "name:{} device:{:?} decode:{:?}",
+                        codec.name,
                         codec.hwdevice,
                         start.elapsed()
                     );
-                    let data = match codec.format {
-                        H264 => &buf264[..],
-                        H265 => &buf265[..],
-                    };
-                    let start = Instant::now();
-                    if let Ok(_) = decoder.decode(data) {
-                        log::debug!(
-                            "name:{} device:{:?} decode:{:?}",
-                            codec.name,
-                            codec.hwdevice,
-                            start.elapsed()
-                        );
-                        infos.lock().unwrap().push(codec);
-                    } else {
-                        log::debug!(
-                            "name:{} device:{:?} decode failed:{:?}",
-                            codec.name,
-                            codec.hwdevice,
-                            start.elapsed()
-                        );
-                    }
+                    infos.lock().unwrap().push(codec.clone());
                 } else {
                     log::debug!(
-                        "name:{} device:{:?} new failed:{:?}",
-                        codec.name.clone(),
+                        "name:{} device:{:?} decode failed:{:?}",
+                        codec.name,
                         codec.hwdevice,
                         start.elapsed()
                     );
                 }
-            });
+            } else {
+                log::debug!(
+                    "name:{} device:{:?} new failed:{:?}",
+                    codec.name.clone(),
+                    codec.hwdevice,
+                    start.elapsed()
+                );
+            }
+            log::info!("test decoder {:?} end", codec);
+            // });
 
-            handles.push(handle);
+            // handles.push(handle);
         }
-        for handle in handles {
-            handle.join().ok();
-        }
+        // for handle in handles {
+        //     handle.join().ok();
+        // }
         #[cfg(windows)]
         let res = infos.lock().unwrap().clone();
         #[cfg(target_os = "linux")]
@@ -373,6 +377,7 @@ impl Decoder {
         {
             // VAAPI is slow on nvidia, but fast on amd
             if res.iter().all(|c| c.hwdevice != AV_HWDEVICE_TYPE_CUDA) {
+                log::debug!("start lsmod");
                 if std::process::Command::new("sh")
                     .arg("-c")
                     .arg("lsmod | grep amdgpu >/dev/null 2>&1")
@@ -384,12 +389,14 @@ impl Decoder {
                         .map(|c| c.score = 91)
                         .count();
                 }
+                log::debug!("end lsmod");
             }
         }
 
         unsafe {
             av_log_set_level(log_level);
         }
+        log::info!("finish available_decoders_");
 
         res
     }
